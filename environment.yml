@@ -1,0 +1,33 @@
+name: long_lamp
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda=12.1     
+  - transformers
+  - datasets
+  - evaluate
+  - accelerate
+  - scikit-learn         
+  - pandas               
+  - matplotlib           
+  - tqdm                 
+  - huggingface_hub      
+  - pyarrow              
+  - pip
+  - pip:
+      - llama-index
+      - llama-cpp-python
+      - peft             
+      - bitsandbytes     
+      - sentence-transformers 
+      - wandb            
+      - faiss-gpu        
+      - absl-py          
+      - rouge_score
