@@ -48,7 +48,7 @@ if __name__ == "__main__":
         dataset_name=args.dataset,
         use_profile=args.use_profile,
         task=args.task,
-        split="test", 
+        split="val", 
         create_prompt=prompt_gen
     )
 
