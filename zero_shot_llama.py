@@ -3,7 +3,7 @@ import os
 import transformers
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, pipeline
-from data.datasets_llama import GeneralSeq2SeqDataset
+from data.datasets_llama import GeneralSeq2SeqDataset, prompt_iterator
 from prompts.prompt import create_prompt_generator
 import json
 from tqdm import tqdm
@@ -21,6 +21,7 @@ parser.add_argument("--retriever", default="bm25")
 parser.add_argument("--num_support_profile", type=int, default=3) # 检索条数
 parser.add_argument("--is_ranked", action="store_true")
 parser.add_argument("--max_length", type=int, default=512)
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -43,7 +44,6 @@ if __name__ == "__main__":
         )
 
     # 3. 加载数据集 (使用你重构后的类，直接从 HF 下载)
-    # 注意：这里我们加载测试集 split="test"
     eval_dataset = GeneralSeq2SeqDataset(
         dataset_name=args.dataset,
         use_profile=args.use_profile,
@@ -58,6 +58,7 @@ if __name__ == "__main__":
         bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_quant_type="nf4"
     )
+
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         quantization_config=quantization_config,
@@ -71,56 +72,27 @@ if __name__ == "__main__":
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        batch_size=16, # 根据显存调整
+        batch_size=16,
     )
 
-    out_path = os.path.join(args.output_dir, f"{args.name}_predictions.jsonl")
-    
-    print(f"开始推理任务: {args.task}，样本总数: {len(eval_dataset)}")
-    
+    outputs = pipe(
+        prompt_iterator(eval_dataset, tokenizer),
+        batch_size=16,        
+        max_new_tokens=args.max_length,
+        return_full_text=False,
+        pad_token_id=tokenizer.eos_token_id
+    )
+
+    out_path = os.path.join(args.output_dir, f"{args.name}_results.jsonl")
+
+    # 保存结果
     with open(out_path, "w", encoding="utf-8") as fout:
-        # 使用 DataLoader 思想进行 Batch 处理
-        batch_size = 16
-        for i in tqdm(range(0, len(eval_dataset), batch_size)):
-            batch_range = range(i, min(i + batch_size, len(eval_dataset)))
+        for out, raw_item in tqdm(zip(outputs, eval_dataset), total=len(eval_dataset)):
+            pred = out[0]["generated_text"] if isinstance(out, list) else out["generated_text"]
             
-            batch_texts = []
-            batch_raw_data = []
-            
-            for idx in batch_range:
-                data_item = eval_dataset[idx] # 这里会自动触发 create_prompt
-                source_text = data_item["source"]
-                
-                # 应用 Llama-3 聊天模板
-                messages = [
-                    {"role": "system", "content": "You are a personalized assistant."},
-                    {"role": "user", "content": source_text},
-                ]
-                input_prompt = tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
-                )
-                batch_texts.append(input_prompt)
-                batch_raw_data.append(data_item)
-
-            # 执行推理
-            outputs = pipe(
-                batch_texts,
-                max_new_tokens=args.max_length,
-                return_full_text=False,
-                pad_token_id=tokenizer.eos_token_id
-            )
-
-            # 保存结果
-            for idx, out in enumerate(outputs):
-                if isinstance(out, list):
-                    pred = out[0]["generated_text"]
-                else:
-                    pred = out["generated_text"]
-                record = {
-                    "input": batch_raw_data[idx]["source"],
-                    "target": batch_raw_data[idx]["target"],
-                    "prediction": pred.strip(),
-                }
-                fout.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-    print(f"推理完成，结果已保存至: {out_path}")
+            record = {
+                "input": raw_item["raw_input"],
+                "target": raw_item["target"],
+                "prediction": pred.strip(),
+            }
+            fout.write(json.dumps(record, ensure_ascii=False) + "\n")

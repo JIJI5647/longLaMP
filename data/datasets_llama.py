@@ -22,11 +22,13 @@ class GeneralSeq2SeqDataset(Dataset):
     def __getitem__(self, index):
         if self.use_profile:
             return {
+                "raw_input" : self.data[index]['input'],
                 "source" : self.create_prompt(self.data[index]['input'], self.data[index]['profile'], self.task),
                 "target" : self.data[index]['output']
             }
         else:
             return {
+                "raw_input" : self.data[index]['input'],
                 "source" : self.data[index]['input'],
                 "target" : self.data[index]['output']
             }
@@ -34,4 +36,13 @@ class GeneralSeq2SeqDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+
+def prompt_iterator(eval_dataset, tokenizer):
+    for item in eval_dataset:
+        # 这里会自动触发你定义的 GeneralSeq2SeqDataset.__getitem__
+        messages = [
+            {"role": "system", "content": "You are a personalized assistant."},
+            {"role": "user", "content": item["source"]},
+        ]
+        yield tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 

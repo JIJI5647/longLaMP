@@ -1,8 +1,9 @@
 import evaluate
 import json
 import os
-from tqdm import tqdm # 强烈建议安装 tqdm: pip install tqdm
+from tqdm import tqdm 
 import nltk
+
 
 # 加载评估插件
 print("正在初始化评估指标 (可能会下载数据)...")
@@ -55,15 +56,18 @@ def evaluate_generation(file_path):
     print("正在计算 Meteor 分数...")
     meteor_result = meteor.compute(predictions=predictions, references=references)
     print("Meteor 计算完成。")
+
     return {
         'rouge': rouge_results,
         'bleu': bleu_results,
-        'meteor': meteor_result
+        'meteor' : meteor_result
     }
+    
+    
 
 if __name__ == "__main__":
     # 确保路径是绝对路径或正确的相对路径
-    result_file = "/root/output/val_predictions.jsonl"
+    result_file = "/root/src/longLaMP/output/test_run_results.jsonl"
     
     try:
         results = evaluate_generation(result_file)

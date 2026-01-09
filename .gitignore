@@ -8,6 +8,8 @@ models/
 # 忽略output
 output/
 
+model/
+
 # 忽略系统环境变量
 .env
 token.txt
